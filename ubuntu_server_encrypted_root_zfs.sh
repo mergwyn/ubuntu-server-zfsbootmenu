@@ -47,7 +47,8 @@ RPOOL="rpool" #Root pool name.
 topology_root="single" #"single", "mirror", "raid0", "raidz1", "raidz2", or "raidz3" topology on root pool.
 disks_root="1" #Number of disks in array for root pool. Not used with single topology.
 EFI_boot_size="512" #EFI boot loader partition size in mebibytes (MiB).
-swap_size="500" #Swap partition size in mebibytes (MiB). Size of swap will be larger than defined here with Raidz topologies.
+swap_size="500" #Swap partition size in megabytes (MiB). Size of swap will be larger than defined here with Raidz topologies. Set to auto to base it on real memory size
+swap_mult="50" # if swap_size set to auto this is the percentage of real memory used for swap
 datapool="datapool" #Non-root drive data pool name.
 topology_data="single" #"single", "mirror", "raid0", "raidz1", "raidz2", or "raidz3" topology on data pool.
 disks_data="1" #Number of disks in array for data pool. Not used with single topology.
@@ -465,7 +466,16 @@ debootstrap_part1_Func(){
 			##https://github.com/zfsonlinux/zfs/issues/7734
 			##hibernate needs swap at least same size as RAM
 			##hibernate only works with unencrypted installs
-			sgdisk -n2:0:+"$swap_size"M -t2:"$swap_hex_code" /dev/disk/by-id/"${diskidnum}"
+
+                        declare -i _swap_size=${swap_size}
+                        if [[ "${swap_size}" = "auto" ]]
+                        then
+                                _size=$(grep MemTotal < /proc/meminfo | awk '{print $2}')
+                                test -n "${_size}"
+                                # convert from KB TO MB and apply multiplier
+                                _swap_size=$((_size/1024/*swap_mult/100))
+                        fi
+			sgdisk -n2:0:+"$_swap_size"M -t2:"$swap_hex_code" /dev/disk/by-id/"${diskidnum}"
 		
 			##2.6 Create root pool partition
 			##Unencrypted or ZFS native encryption:
